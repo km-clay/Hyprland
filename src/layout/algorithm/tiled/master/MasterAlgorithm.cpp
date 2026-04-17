@@ -725,10 +725,13 @@ std::expected<void, std::string> CMasterAlgorithm::layoutMsg(const std::string_v
 
         auto oldMasterIt = std::ranges::find(m_masterNodesData, OLDMASTER);
 
+        SP<ITarget> newFocus;
+
         for (auto& nd : m_masterNodesData) {
             if (!nd->isMaster) {
                 const auto& newMaster = nd;
                 newMaster->isMaster   = true;
+                newFocus              = newMaster->pTarget.lock();
 
                 auto newMasterIt = std::ranges::find(m_masterNodesData, newMaster);
 
@@ -737,7 +740,6 @@ std::expected<void, std::string> CMasterAlgorithm::layoutMsg(const std::string_v
                 else if (newMasterIt > oldMasterIt)
                     std::ranges::rotate(oldMasterIt, newMasterIt, std::next(newMasterIt));
 
-                switchToWindow(newMaster->pTarget.lock());
                 OLDMASTER->isMaster = false;
 
                 oldMasterIt = std::ranges::find(m_masterNodesData, OLDMASTER);
@@ -749,6 +751,8 @@ std::expected<void, std::string> CMasterAlgorithm::layoutMsg(const std::string_v
         }
 
         calculateWorkspace();
+        if (newFocus)
+            switchToWindow(newFocus);
     } else if (command == "rollprev") {
         const auto PNODE = getNodeFromWindow(PWINDOW);
 
@@ -761,10 +765,13 @@ std::expected<void, std::string> CMasterAlgorithm::layoutMsg(const std::string_v
 
         auto oldMasterIt = std::ranges::find(m_masterNodesData, OLDMASTER);
 
+        SP<ITarget> newFocus;
+
         for (auto& nd : m_masterNodesData | std::views::reverse) {
             if (!nd->isMaster) {
                 const auto& newMaster = nd;
                 newMaster->isMaster   = true;
+                newFocus              = newMaster->pTarget.lock();
 
                 auto newMasterIt = std::ranges::find(m_masterNodesData, newMaster);
 
@@ -773,7 +780,6 @@ std::expected<void, std::string> CMasterAlgorithm::layoutMsg(const std::string_v
                 else if (newMasterIt > oldMasterIt)
                     std::ranges::rotate(oldMasterIt, newMasterIt, std::next(newMasterIt));
 
-                switchToWindow(newMaster->pTarget.lock());
                 OLDMASTER->isMaster = false;
 
                 oldMasterIt = std::ranges::find(m_masterNodesData, OLDMASTER);
@@ -785,6 +791,8 @@ std::expected<void, std::string> CMasterAlgorithm::layoutMsg(const std::string_v
         }
 
         calculateWorkspace();
+        if (newFocus)
+            switchToWindow(newFocus);
     }
 
     return {};
