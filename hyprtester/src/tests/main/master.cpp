@@ -2,6 +2,7 @@
 #include "../../shared.hpp"
 #include "../../hyprctlCompat.hpp"
 #include "tests.hpp"
+#include <algorithm>
 
 static int ret = 0;
 
@@ -158,6 +159,78 @@ static void testFsBehavior() {
     Tests::killAllWindows();
 }
 
+static void testRollFocus() {
+    // set up windows
+    std::vector<std::string> windows = {"slave1", "slave2", "slave3", "master"};
+
+    // helper lambda thing
+    auto roll = [&](const std::string& dir) {
+        auto pivot = (dir == "rollnext") ? windows.begin() + 1 : windows.end() - 1;
+
+        // rotate the windows vector along with the actual windows
+        // the rolling behavior of the window focus should follow the
+        // rotating behavior of std::ranges::rotate
+        OK(getFromSocket("/dispatch layoutmsg " + dir));
+        std::ranges::rotate(windows.begin(), pivot, windows.end());
+        EXPECT_CONTAINS(getFromSocket("/activewindow"), "class: " + windows.back());
+    };
+
+    for (auto const& win : windows) {
+        if (!Tests::spawnKitty(win)) {
+            NLog::log("{}Failed to spawn kitty with win class `{}`", Colors::RED, win);
+            ++TESTS_FAILED;
+            ret = 1;
+            return;
+        }
+    }
+
+    // focus master
+    OK(getFromSocket("/dispatch layoutmsg focusmaster master"));
+    EXPECT_CONTAINS(getFromSocket("/activewindow"), "class: master");
+
+    // put the windows in the washing machine
+    NLog::log("{}Testing rollnext", Colors::YELLOW);
+    for (int i = 0; i < 20; ++i) {
+        roll("rollnext");
+    }
+
+    NLog::log("{}Testing rollprev", Colors::YELLOW);
+    for (int i = 0; i < 20; ++i) {
+        roll("rollprev");
+    }
+
+
+    NLog::log("{}Testing rollnext with rollprev", Colors::YELLOW);
+    for (int i = 0; i < 10; ++i) {
+        for (int j = 0; j < 5; ++j) {
+            roll("rollnext");
+        }
+        roll("rollprev");
+    }
+
+    NLog::log("{}Testing rollnext/rollprev alternation", Colors::YELLOW);
+    for (int i = 0; i < 20; ++i) {
+        if (i % 2 == 0) {
+            roll("rollnext");
+        } else {
+            roll("rollprev");
+        }
+    }
+
+    NLog::log("{}Testing rollnext/rollprev burst calls", Colors::YELLOW);
+    for (int i = 0; i < 20; ++i) {
+        if (i / 5 % 2 == 0) {
+            roll("rollnext");
+        } else {
+            roll("rollprev");
+        }
+    }
+
+    // clean up
+    NLog::log("{}Killing all windows", Colors::YELLOW);
+    Tests::killAllWindows();
+}
+
 static bool test() {
     NLog::log("{}Testing Master layout", Colors::GREEN);
 
@@ -171,6 +244,9 @@ static bool test() {
 
     NLog::log("{}Testing fs behavior", Colors::GREEN);
     testFsBehavior();
+
+    NLog::log("{}Testing rollnext and rollprev", Colors::GREEN);
+    testRollFocus();
 
     // clean up
     NLog::log("Cleaning up", Colors::YELLOW);
